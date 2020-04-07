@@ -1,8 +1,11 @@
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use derive_more::{Deref, DerefMut, From};
+use std::collections::HashMap;
 use std::{
+    collections::hash_map::{Entry, RandomState},
     convert::TryInto,
-    io::{self, Read, Write},
+    hash::BuildHasher,
+    io::{self, BufRead, Read, Write},
     num::TryFromIntError,
     string::FromUtf8Error,
 };
@@ -170,38 +173,165 @@ pub trait WriteExt: Write {
 
 impl<W> WriteExt for W where W: Write + ?Sized {}
 
+#[derive(Clone, Debug, PartialEq, Deref, DerefMut, From)]
+pub struct Map<S>(HashMap<Key, Value, S>)
+where
+    S: BuildHasher;
+
+impl Map<RandomState> {
+    #[inline]
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(HashMap::with_capacity(capacity))
+    }
+}
+
+impl<S> Map<S>
+where
+    S: BuildHasher,
+{
+    pub fn read<R>(&mut self, mut reader: R) -> Result<()>
+    where
+        R: BufRead,
+    {
+        let mut buffer = reader.fill_buf()?;
+        let mut len = buffer.len();
+        while len > 0 {
+            let (k, v) = reader.read_kv()?;
+            self.insert(k, v);
+
+            buffer = reader.fill_buf()?;
+            len = buffer.len();
+        }
+
+        Ok(())
+    }
+
+    pub fn write<W>(&self, mut writer: W) -> Result<()>
+    where
+        W: Write,
+    {
+        for (k, v) in self.iter() {
+            writer.write_kv(*k, v)?;
+        }
+        Ok(())
+    }
+
+    // HashMap overrides
+
+    #[inline]
+    pub fn with_hasher(hash_builder: S) -> Self {
+        Self(HashMap::with_hasher(hash_builder))
+    }
+
+    #[inline]
+    pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
+        Self(HashMap::with_capacity_and_hasher(capacity, hash_builder))
+    }
+
+    #[inline]
+    pub fn entry<K>(&mut self, key: K) -> Entry<Key, Value>
+    where
+        K: Into<Key>,
+    {
+        self.0.entry(key.into())
+    }
+
+    #[inline]
+    pub fn get<K>(&self, key: K) -> Option<&Value>
+    where
+        K: Into<Key>,
+    {
+        self.0.get(&key.into())
+    }
+
+    #[inline]
+    pub fn get_key_value<K>(&self, key: K) -> Option<(Key, &Value)>
+    where
+        K: Into<Key>,
+    {
+        self.0.get_key_value(&key.into()).map(|(k, v)| (*k, v))
+    }
+
+    #[inline]
+    pub fn contains_key<K>(&self, key: K) -> bool
+    where
+        K: Into<Key>,
+    {
+        self.0.contains_key(&key.into())
+    }
+
+    #[inline]
+    pub fn get_mut<K>(&mut self, key: K) -> Option<&mut Value>
+    where
+        K: Into<Key>,
+    {
+        self.0.get_mut(&key.into())
+    }
+
+    #[inline]
+    pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
+    where
+        K: Into<Key>,
+        V: Into<Value>,
+    {
+        self.0.insert(key.into(), value.into())
+    }
+
+    #[inline]
+    pub fn remove<K>(&mut self, key: K) -> Option<Value>
+    where
+        K: Into<Key>,
+    {
+        self.0.remove(&key.into())
+    }
+
+    #[inline]
+    pub fn remove_entry<K>(&mut self, key: K) -> Option<(Key, Value)>
+    where
+        K: Into<Key>,
+    {
+        self.0.remove_entry(&key.into())
+    }
+}
+
+impl Default for Map<RandomState> {
+    fn default() -> Self {
+        Self(HashMap::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{Key, ReadExt, Sha1, Value, WriteExt};
-    use std::{collections::HashMap, io::Cursor};
+    use crate::{Map, Sha1, Value};
+    use std::io::Cursor;
 
     #[test]
     fn write_and_read() {
-        let mut old: HashMap<Key, Value> = HashMap::new();
-        old.insert(0.into(), 0u8.into());
-        old.insert(1.into(), 0u16.into());
-        old.insert(2.into(), 0u32.into());
-        old.insert(3.into(), Value::ShortString("short string".to_owned()));
-        old.insert(4.into(), "long string".into());
-        old.insert(5.into(), vec![0, 1, 2, 3, 4, 5].into());
-        old.insert(6.into(), true.into());
-        old.insert(7.into(), 7.7.into());
-        old.insert(8.into(), Sha1([0; 20]).into());
+        let mut old = Map::new();
+        old.insert(0, 0u8);
+        old.insert(1, 0u16);
+        old.insert(2, 0u32);
+        old.insert(3, Value::ShortString("short string".to_owned()));
+        old.insert(4, "long string");
+        old.insert(5, vec![0, 1, 2, 3, 4, 5]);
+        old.insert(6, true);
+        old.insert(7, 7.7);
+        old.insert(8, Sha1([0; 20]));
 
         let len = old.len();
 
         let mut buffer = Vec::with_capacity(len * 6);
-        for (k, v) in old.iter() {
-            buffer.write_kv(*k, v).unwrap();
-        }
+        old.write(&mut buffer).unwrap();
 
-        let mut new: HashMap<Key, Value> = HashMap::with_capacity(len);
+        let mut new = Map::with_capacity(len);
         let mut cursor = Cursor::new(buffer);
-        for _ in 0..len {
-            let (k, v) = cursor.read_kv().unwrap();
-            new.insert(k, v);
-        }
+        new.read(&mut cursor).unwrap();
 
-        assert_eq!(old, new);
+        assert_eq!(*old, *new);
     }
 }
