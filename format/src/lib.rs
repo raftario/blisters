@@ -23,7 +23,7 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Deref, DerefMut, From)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Deref, DerefMut, From)]
 pub struct Key(u32);
 
 #[derive(Copy, Clone, Debug, Deref, DerefMut, From)]
@@ -49,6 +49,12 @@ pub enum Value {
     Bool(bool),
     Float(f32),
     Sha1(Sha1),
+}
+
+impl std::convert::From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Self::LongString(s.to_owned())
+    }
 }
 
 impl Value {
@@ -118,10 +124,10 @@ pub trait ReadExt: Read {
 impl<R> ReadExt for R where R: Read + ?Sized {}
 
 pub trait WriteExt: Write {
-    fn write_kv<K, V>(&mut self, key: K, value: V) -> Result<()>
+    fn write_kv<'a, K, V>(&mut self, key: K, value: V) -> Result<()>
     where
         K: Into<Key>,
-        V: Into<Value>,
+        V: Into<&'a Value>,
     {
         let key = key.into();
         let value = value.into();
@@ -130,17 +136,17 @@ pub trait WriteExt: Write {
 
         self.write_u8(value.data_type())?;
         match value {
-            Value::U8(v) => self.write_u8(v)?,
-            Value::U16(v) => self.write_u16::<LE>(v)?,
-            Value::U32(v) => self.write_u32::<LE>(v)?,
+            Value::U8(v) => self.write_u8(*v)?,
+            Value::U16(v) => self.write_u16::<LE>(*v)?,
+            Value::U32(v) => self.write_u32::<LE>(*v)?,
             Value::ShortString(v) => {
-                let utf8 = v.into_bytes();
+                let utf8 = v.clone().into_bytes();
                 let len = utf8.len().try_into()?;
                 self.write_u8(len)?;
                 self.write_all(&utf8)?;
             }
             Value::LongString(v) => {
-                let utf8 = v.into_bytes();
+                let utf8 = v.clone().into_bytes();
                 let len = utf8.len().try_into()?;
                 self.write_u16::<LE>(len)?;
                 self.write_all(&utf8)?;
@@ -151,10 +157,10 @@ pub trait WriteExt: Write {
                 self.write_all(&v)?;
             }
             Value::Bool(v) => {
-                let value = if v { 1 } else { 0 };
+                let value = if *v { 1 } else { 0 };
                 self.write_u8(value)?;
             }
-            Value::Float(v) => self.write_f32::<LE>(v)?,
+            Value::Float(v) => self.write_f32::<LE>(*v)?,
             Value::Sha1(v) => self.write_all(&v[..])?,
         }
 
@@ -163,3 +169,39 @@ pub trait WriteExt: Write {
 }
 
 impl<W> WriteExt for W where W: Write + ?Sized {}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Key, ReadExt, Sha1, Value, WriteExt};
+    use std::{collections::HashMap, io::Cursor};
+
+    #[test]
+    fn write_and_read() {
+        let mut old: HashMap<Key, Value> = HashMap::new();
+        old.insert(0.into(), 0u8.into());
+        old.insert(1.into(), 0u16.into());
+        old.insert(2.into(), 0u32.into());
+        old.insert(3.into(), Value::ShortString("short string".to_owned()));
+        old.insert(4.into(), "long string".into());
+        old.insert(5.into(), vec![0, 1, 2, 3, 4, 5].into());
+        old.insert(6.into(), true.into());
+        old.insert(7.into(), 7.7.into());
+        old.insert(8.into(), Sha1([0; 20]).into());
+
+        let len = old.len();
+
+        let mut buffer = Vec::with_capacity(len * 6);
+        for (k, v) in old.iter() {
+            buffer.write_kv(*k, v).unwrap();
+        }
+
+        let mut new: HashMap<Key, Value> = HashMap::with_capacity(len);
+        let mut cursor = Cursor::new(buffer);
+        for _ in 0..len {
+            let (k, v) = cursor.read_kv().unwrap();
+            new.insert(k, v);
+        }
+
+        assert_eq!(old, new);
+    }
+}
