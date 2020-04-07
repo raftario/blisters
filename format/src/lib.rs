@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::{
     collections::hash_map::{Entry, RandomState},
     convert::TryInto,
-    hash::BuildHasher,
+    hash::{BuildHasher, Hash, Hasher},
     io::{self, BufRead, Read, Write},
     num::TryFromIntError,
     string::FromUtf8Error,
@@ -26,8 +26,23 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Deref, DerefMut, From)]
+#[derive(Copy, Clone, Debug, Deref, DerefMut, From)]
 pub struct Key(u32);
+
+impl PartialEq for Key {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        **self == **other
+    }
+}
+impl Eq for Key {}
+
+impl Hash for Key {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
+    }
+}
 
 #[derive(Copy, Clone, Debug, Deref, DerefMut, From)]
 pub struct Sha1([u8; 20]);
@@ -123,7 +138,6 @@ pub trait ReadExt: Read {
         Ok((key, value))
     }
 }
-
 impl<R> ReadExt for R where R: Read + ?Sized {}
 
 pub trait WriteExt: Write {
@@ -170,10 +184,9 @@ pub trait WriteExt: Write {
         Ok(())
     }
 }
-
 impl<W> WriteExt for W where W: Write + ?Sized {}
 
-#[derive(Clone, Debug, PartialEq, Deref, DerefMut, From)]
+#[derive(Clone, Debug, Deref, DerefMut, From)]
 pub struct Map<S>(HashMap<Key, Value, S>)
 where
     S: BuildHasher;
@@ -305,6 +318,16 @@ impl Default for Map<RandomState> {
     }
 }
 
+impl<S> PartialEq for Map<S>
+where
+    S: BuildHasher,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        **self == **other
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{Map, Sha1, Value};
@@ -332,6 +355,6 @@ mod tests {
         let mut cursor = Cursor::new(buffer);
         new.read(&mut cursor).unwrap();
 
-        assert_eq!(*old, *new);
+        assert_eq!(old, new);
     }
 }
