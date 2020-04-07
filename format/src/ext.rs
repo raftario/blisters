@@ -55,14 +55,7 @@ pub trait ReadExt: Read {
 impl<R> ReadExt for R where R: Read + ?Sized {}
 
 pub trait WriteExt: Write {
-    fn write_kv<'a, K, V>(&mut self, key: K, value: V) -> Result<()>
-    where
-        K: Into<Key>,
-        V: Into<&'a Value>,
-    {
-        let key = key.into();
-        let value = value.into();
-
+    fn write_kv(&mut self, key: Key, value: &Value) -> Result<()> {
         self.write_u32::<LE>(*key)?;
 
         self.write_u8(value.data_type())?;
