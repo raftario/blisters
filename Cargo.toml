@@ -1,0 +1,13 @@
+[package]
+name = "blister"
+version = "0.1.0"
+authors = ["Raphaël Thériault <raphael_theriault@outlook.com>"]
+edition = "2018"
+license = "MIT"
+
+[workspace]
+members = [
+    "format",
+]
+
+[dependencies]
