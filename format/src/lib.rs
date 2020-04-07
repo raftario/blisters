@@ -74,14 +74,14 @@ mod tests {
     fn write_and_read() {
         let mut old = Map::new();
         old.insert(0, 0u8);
-        old.insert(1, 0u16);
-        old.insert(2, 0u32);
+        old.insert(1, 1u16);
+        old.insert(2, 2u32);
         old.insert(3, Value::ShortString("short string".to_owned()));
         old.insert(4, "long string");
-        old.insert(5, vec![0, 1, 2, 3, 4, 5]);
+        old.insert(5, vec![5, 5, 5, 5, 5]);
         old.insert(6, true);
         old.insert(7, 7.7);
-        old.insert(8, Sha1::new([0; 20]));
+        old.insert(8, Sha1::new([8; 20]));
 
         let len = old.len();
 
