@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Raphaël Thériault <raphael_theriault@outlook.com>"]
 edition = "2018"
 license = "MIT"
+description = "Rust (and WebAssembly) implementation of the Blister Beat Saber playlist format"
 
 [workspace]
 members = [
@@ -11,3 +12,4 @@ members = [
 ]
 
 [dependencies]
+blister_format = { path = "format" }
