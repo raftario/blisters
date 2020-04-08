@@ -13,3 +13,12 @@ members = [
 
 [dependencies]
 blister_format = { path = "format" }
+byteorder = "1"
+chrono = "0.4"
+constant_time_eq = "0.1"
+thiserror = "1"
+
+[dependencies.flate2]
+version = "1"
+default-features = false
+features = ["miniz_oxide"]

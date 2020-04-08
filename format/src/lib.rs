@@ -5,13 +5,13 @@ pub mod values;
 
 pub use map::Map;
 
-use crate::values::Sha1;
+use crate::{error::Error, values::Sha1};
 use derive_more::{Deref, DerefMut, From};
 use std::hash::{Hash, Hasher};
 
-pub type Result<T> = std::result::Result<T, error::Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Copy, Clone, Debug, Deref, DerefMut, From)]
+#[derive(Debug, Copy, Clone, Deref, DerefMut, From)]
 pub struct Key(u32);
 
 impl PartialEq for Key {
@@ -29,11 +29,12 @@ impl Hash for Key {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, From)]
+#[derive(Debug, Clone, PartialEq, From)]
 pub enum Value {
     U8(u8),
     U16(u16),
     U32(u32),
+    U64(u64),
     #[from(ignore)]
     ShortString(String),
     LongString(String),
@@ -55,12 +56,13 @@ impl Value {
             Value::U8(_) => 0,
             Value::U16(_) => 1,
             Value::U32(_) => 2,
-            Value::ShortString(_) => 3,
-            Value::LongString(_) => 4,
-            Value::Binary(_) => 5,
-            Value::Bool(_) => 6,
-            Value::Float(_) => 7,
-            Value::Sha1(_) => 8,
+            Value::U64(_) => 3,
+            Value::ShortString(_) => 4,
+            Value::LongString(_) => 5,
+            Value::Binary(_) => 6,
+            Value::Bool(_) => 7,
+            Value::Float(_) => 8,
+            Value::Sha1(_) => 9,
         }
     }
 }
@@ -76,12 +78,13 @@ mod tests {
         old.insert(0, 0u8);
         old.insert(1, 1u16);
         old.insert(2, 2u32);
-        old.insert(3, Value::ShortString("short string".to_owned()));
-        old.insert(4, "long string");
-        old.insert(5, vec![5, 5, 5, 5, 5]);
-        old.insert(6, true);
-        old.insert(7, 7.7);
-        old.insert(8, Sha1::new([8; 20]));
+        old.insert(3, 3u64);
+        old.insert(4, Value::ShortString("short string".to_owned()));
+        old.insert(5, "long string");
+        old.insert(6, vec![6, 6, 6, 6, 6, 6]);
+        old.insert(7, true);
+        old.insert(8, 8.8);
+        old.insert(9, Sha1([9; 20]));
 
         let len = old.len();
 

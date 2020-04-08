@@ -26,6 +26,10 @@ pub trait ReadExt: Read {
                 Value::U32(self.read_u32::<LE>()?)
             }
             3 => {
+                read = 4 + 1 + 8;
+                Value::U64(self.read_u64::<LE>()?)
+            }
+            4 => {
                 let len = self.read_u8()? as usize;
                 let mut utf8 = vec![0; len];
                 self.read_exact(&mut utf8)?;
@@ -33,7 +37,7 @@ pub trait ReadExt: Read {
                 read = 4 + 1 + 1 + len;
                 Value::ShortString(String::from_utf8(utf8)?)
             }
-            4 => {
+            5 => {
                 let len = self.read_u16::<LE>()? as usize;
                 let mut utf8 = vec![0; len];
                 self.read_exact(&mut utf8)?;
@@ -41,7 +45,7 @@ pub trait ReadExt: Read {
                 read = 4 + 1 + 2 + len;
                 Value::LongString(String::from_utf8(utf8)?)
             }
-            5 => {
+            6 => {
                 let len = self.read_u32::<LE>()? as usize;
                 let mut bytes = vec![0; len];
                 self.read_exact(&mut bytes)?;
@@ -49,7 +53,7 @@ pub trait ReadExt: Read {
                 read = 4 + 1 + 4 + len;
                 Value::Binary(bytes)
             }
-            6 => {
+            7 => {
                 let value = self.read_u8()?;
 
                 read = 4 + 1 + 1;
@@ -59,16 +63,16 @@ pub trait ReadExt: Read {
                     _ => return Err(Error::InvalidBoolean(value)),
                 }
             }
-            7 => {
+            8 => {
                 read = 4 + 1 + 4;
                 Value::Float(self.read_f32::<LE>()?)
             }
-            8 => {
+            9 => {
                 let mut hash = [0; 20];
                 self.read_exact(&mut hash)?;
 
                 read = 4 + 1 + 20;
-                Value::Sha1(Sha1::new(hash))
+                Value::Sha1(Sha1(hash))
             }
             _ => return Err(Error::InvalidDataType(data_type)),
         };
@@ -97,6 +101,10 @@ pub trait WriteExt: Write {
             Value::U32(v) => {
                 self.write_u32::<LE>(*v)?;
                 written = 4 + 1 + 4;
+            }
+            Value::U64(v) => {
+                self.write_u64::<LE>(*v)?;
+                written = 4 + 1 + 8;
             }
             Value::ShortString(v) => {
                 let utf8 = v.clone().into_bytes();

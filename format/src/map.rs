@@ -11,7 +11,7 @@ use std::{
     io::{BufWriter, Read, Write},
 };
 
-#[derive(Clone, Debug, Deref, DerefMut, From)]
+#[derive(Debug, Clone, Deref, DerefMut, From)]
 pub struct Map(HashMap<Key, Value, FnvBuildHasher>);
 
 impl Map {

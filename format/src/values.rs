@@ -1,14 +1,7 @@
 use derive_more::{Deref, DerefMut, From};
 
-#[derive(Copy, Clone, Debug, Deref, DerefMut, From)]
-pub struct Sha1([u8; 20]);
-
-impl Sha1 {
-    #[inline]
-    pub fn new(hash: [u8; 20]) -> Self {
-        Self(hash)
-    }
-}
+#[derive(Debug, Copy, Clone, Deref, DerefMut, From)]
+pub struct Sha1(pub [u8; 20]);
 
 impl PartialEq for Sha1 {
     #[inline]
