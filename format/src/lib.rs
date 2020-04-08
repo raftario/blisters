@@ -68,7 +68,7 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use crate::{values::Sha1, Map, Value};
-    use std::io::Cursor;
+    use std::io::{BufReader, BufWriter};
 
     #[test]
     fn write_and_read() {
@@ -85,12 +85,12 @@ mod tests {
 
         let len = old.len();
 
-        let mut buffer = Vec::with_capacity(len * 6);
-        old.write(&mut buffer).unwrap();
+        let mut writer = BufWriter::new(Vec::with_capacity(4 + (len * (4 + 1 + 1))));
+        old.write(&mut writer).unwrap();
 
+        let mut reader = BufReader::new(writer.buffer());
         let mut new = Map::with_capacity(len);
-        let mut cursor = Cursor::new(buffer);
-        new.read(&mut cursor).unwrap();
+        new.read(&mut reader).unwrap();
 
         assert_eq!(old, new);
     }

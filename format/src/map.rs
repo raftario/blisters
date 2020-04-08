@@ -2,11 +2,13 @@ use crate::{
     ext::{ReadExt, WriteExt},
     Key, Result, Value,
 };
+use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use derive_more::{Deref, DerefMut, From};
 use fnv::FnvBuildHasher;
 use std::{
     collections::hash_map::{Entry, HashMap},
-    io::{BufRead, Write},
+    convert::TryInto,
+    io::{BufWriter, Read, Write},
 };
 
 #[derive(Clone, Debug, Deref, DerefMut, From)]
@@ -15,18 +17,15 @@ pub struct Map(HashMap<Key, Value, FnvBuildHasher>);
 impl Map {
     pub fn read<R>(&mut self, mut reader: R) -> Result<()>
     where
-        R: BufRead,
+        R: Read,
     {
-        let mut buffer = reader.fill_buf()?;
-        let mut len = buffer.len();
-        while len > 0 {
-            let (k, v) = reader.read_kv()?;
+        let len = reader.read_u32::<LE>()? as usize;
+        let mut i = 0;
+        while i < len {
+            let (r, (k, v)) = reader.read_kv()?;
+            i += r;
             self.insert(k, v);
-
-            buffer = reader.fill_buf()?;
-            len = buffer.len();
         }
-
         Ok(())
     }
 
@@ -34,9 +33,13 @@ impl Map {
     where
         W: Write,
     {
+        let mut buffer = BufWriter::new(Vec::with_capacity(self.len() * (4 + 1 + 1)));
+        let mut i = 0;
         for (k, v) in self.iter() {
-            writer.write_kv(*k, v)?;
+            i += buffer.write_kv(*k, v)?;
         }
+        writer.write_u32::<LE>(i.try_into()?)?;
+        writer.write_all(buffer.buffer())?;
         Ok(())
     }
 
