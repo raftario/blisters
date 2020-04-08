@@ -16,6 +16,7 @@ blister_format = { path = "format" }
 byteorder = "1"
 chrono = "0.4"
 constant_time_eq = "0.1"
+num_enum = "0.4"
 thiserror = "1"
 
 [dependencies.flate2]

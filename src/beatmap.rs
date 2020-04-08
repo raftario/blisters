@@ -1,8 +1,11 @@
 use crate::{error::Error, Result};
 use blister_format::{values::Sha1, Map, Value};
 use chrono::{DateTime, TimeZone, Utc};
-use std::convert::TryInto;
-use std::io::Read;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use std::{
+    convert::TryInto,
+    io::{Read, Write},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Beatmap {
@@ -18,7 +21,7 @@ pub struct Beatmap {
 }
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, IntoPrimitive, TryFromPrimitive)]
 pub enum BeatmapType {
     Key = 0,
     Hash = 1,
@@ -28,13 +31,11 @@ pub enum BeatmapType {
     Unknown = 255,
 }
 
-impl From<u8> for BeatmapType {
+impl BeatmapType {
+    #[inline]
     fn from(u: u8) -> Self {
         match u {
-            0 => Self::Key,
-            1 => Self::Hash,
-            2 => Self::Zip,
-            3 => Self::LevelId,
+            0..=3 => u.try_into().unwrap(),
             _ => Self::Unknown,
         }
     }
@@ -50,7 +51,7 @@ impl Beatmap {
 
         let ty = match data.remove(0) {
             Some(Value::U8(u)) => {
-                let ty = u.into();
+                let ty = BeatmapType::from(u);
                 if strict && ty == BeatmapType::Unknown {
                     return Err(Error::StrictModeUnknownBeatmapType(u));
                 }
@@ -119,5 +120,38 @@ impl Beatmap {
 
             custom_data: data,
         })
+    }
+
+    pub(crate) fn write<W>(self, mut writer: W) -> Result<()>
+    where
+        W: Write,
+    {
+        let Self {
+            ty,
+            date_added,
+            key,
+            hash,
+            zip,
+            level_id,
+            custom_data: mut data,
+        } = self;
+
+        data.insert(0, Value::U8(ty.into()));
+        data.insert(1, Value::U64(date_added.timestamp().try_into()?));
+        if let Some(u) = key {
+            data.insert(2, Value::U32(u));
+        }
+        if let Some(h) = hash {
+            data.insert(3, Value::Sha1(h));
+        }
+        if let Some(b) = zip {
+            data.insert(4, Value::Binary(b));
+        }
+        if let Some(s) = level_id {
+            data.insert(5, Value::ShortString(s));
+        }
+
+        data.write(&mut writer)?;
+        Ok(())
     }
 }

@@ -1,8 +1,11 @@
 use crate::{error::Error, Beatmap, Result, MAGIC_NUMBER, MAGIC_NUMBER_LEN};
 use blister_format::{Map, Value};
-use byteorder::{ReadBytesExt, LE};
-use flate2::bufread::GzDecoder;
-use std::io::{BufReader, Read};
+use byteorder::{ReadBytesExt, WriteBytesExt, LE};
+use flate2::{bufread::GzDecoder, write::GzEncoder, Compression};
+use std::{
+    convert::TryInto,
+    io::{BufReader, Read, Write},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Playlist {
@@ -65,5 +68,53 @@ impl Playlist {
             maps,
             custom_data: data,
         })
+    }
+
+    #[inline]
+    pub fn write<W>(self, writer: W) -> Result<()>
+    where
+        W: Write,
+    {
+        self.write_with_compression(writer, Default::default())
+    }
+
+    pub fn write_with_compression<W>(self, mut writer: W, level: Compression) -> Result<()>
+    where
+        W: Write,
+    {
+        writer.write_all(MAGIC_NUMBER)?;
+
+        let mut encoder = GzEncoder::new(
+            Vec::with_capacity((4 + 1 + 1 + 1) + (4 + 1 + 1 + 1) + 4),
+            level,
+        );
+
+        let Self {
+            title,
+            author,
+            description,
+            cover,
+            maps,
+            custom_data: mut data,
+        } = self;
+
+        data.insert(0, Value::ShortString(title));
+        data.insert(1, Value::ShortString(author));
+        if let Some(s) = description {
+            data.insert(2, Value::LongString(s));
+        }
+        if let Some(b) = cover {
+            data.insert(3, Value::Binary(b));
+        }
+        data.write(&mut encoder)?;
+
+        let map_count = maps.len();
+        encoder.write_u32::<LE>(map_count.try_into()?)?;
+        for map in maps {
+            map.write(&mut encoder)?;
+        }
+
+        writer.write_all(&encoder.finish()?)?;
+        Ok(())
     }
 }
