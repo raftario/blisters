@@ -20,6 +20,17 @@ pub struct Playlist {
 }
 
 impl Playlist {
+    pub fn new(title: String, author: String) -> Self {
+        Self {
+            title,
+            author,
+            description: None,
+            cover: None,
+            maps: Default::default(),
+            custom_data: Default::default(),
+        }
+    }
+
     pub fn read<R>(mut reader: R, strict: bool) -> Result<Self>
     where
         R: Read,

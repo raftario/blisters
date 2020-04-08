@@ -70,7 +70,6 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use crate::{values::Sha1, Map, Value};
-    use std::io::{BufReader, BufWriter};
 
     #[test]
     fn write_and_read() {
@@ -88,12 +87,11 @@ mod tests {
 
         let len = old.len();
 
-        let mut writer = BufWriter::new(Vec::with_capacity(4 + (len * (4 + 1 + 1))));
-        old.write(&mut writer).unwrap();
+        let mut buffer = Vec::new();
+        old.write(&mut buffer).unwrap();
 
-        let mut reader = BufReader::new(writer.buffer());
         let mut new = Map::with_capacity(len);
-        new.read(&mut reader).unwrap();
+        new.read(buffer.as_slice()).unwrap();
 
         assert_eq!(old, new);
     }

@@ -42,6 +42,54 @@ impl BeatmapType {
 }
 
 impl Beatmap {
+    pub fn new_key(key: u32) -> Self {
+        Self {
+            ty: BeatmapType::Key,
+            date_added: Utc::now(),
+            key: Some(key),
+            hash: None,
+            zip: None,
+            level_id: None,
+            custom_data: Default::default(),
+        }
+    }
+
+    pub fn new_hash(hash: Sha1) -> Self {
+        Self {
+            ty: BeatmapType::Hash,
+            date_added: Utc::now(),
+            key: None,
+            hash: Some(hash),
+            zip: None,
+            level_id: None,
+            custom_data: Default::default(),
+        }
+    }
+
+    pub fn new_zip(zip: Vec<u8>) -> Self {
+        Self {
+            ty: BeatmapType::Zip,
+            date_added: Utc::now(),
+            key: None,
+            hash: None,
+            zip: Some(zip),
+            level_id: None,
+            custom_data: Default::default(),
+        }
+    }
+
+    pub fn new_level_id(level_id: String) -> Self {
+        Self {
+            ty: BeatmapType::LevelId,
+            date_added: Utc::now(),
+            key: None,
+            hash: None,
+            zip: None,
+            level_id: Some(level_id),
+            custom_data: Default::default(),
+        }
+    }
+
     pub(crate) fn read<R>(mut reader: R, strict: bool) -> Result<Self>
     where
         R: Read,
