@@ -3,33 +3,16 @@ use crate::{
     Key, Result, Value,
 };
 use derive_more::{Deref, DerefMut, From};
+use fnv::FnvBuildHasher;
 use std::{
-    collections::hash_map::{Entry, HashMap, RandomState},
-    hash::BuildHasher,
+    collections::hash_map::{Entry, HashMap},
     io::{BufRead, Write},
 };
 
 #[derive(Clone, Debug, Deref, DerefMut, From)]
-pub struct Map<S>(HashMap<Key, Value, S>)
-where
-    S: BuildHasher;
+pub struct Map(HashMap<Key, Value, FnvBuildHasher>);
 
-impl Map<RandomState> {
-    #[inline]
-    pub fn new() -> Self {
-        Self(HashMap::new())
-    }
-
-    #[inline]
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(HashMap::with_capacity(capacity))
-    }
-}
-
-impl<S> Map<S>
-where
-    S: BuildHasher,
-{
+impl Map {
     pub fn read<R>(&mut self, mut reader: R) -> Result<()>
     where
         R: BufRead,
@@ -60,13 +43,16 @@ where
     // HashMap overrides
 
     #[inline]
-    pub fn with_hasher(hash_builder: S) -> Self {
-        Self(HashMap::with_hasher(hash_builder))
+    pub fn new() -> Self {
+        Self(HashMap::with_hasher(Default::default()))
     }
 
     #[inline]
-    pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
-        Self(HashMap::with_capacity_and_hasher(capacity, hash_builder))
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(HashMap::with_capacity_and_hasher(
+            capacity,
+            Default::default(),
+        ))
     }
 
     #[inline]
@@ -135,16 +121,14 @@ where
     }
 }
 
-impl Default for Map<RandomState> {
+impl Default for Map {
+    #[inline]
     fn default() -> Self {
-        Self(HashMap::new())
+        Self::new()
     }
 }
 
-impl<S> PartialEq for Map<S>
-where
-    S: BuildHasher,
-{
+impl PartialEq for Map {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         **self == **other
